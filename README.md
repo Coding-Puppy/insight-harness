@@ -58,7 +58,7 @@ python3 -m http.server 8080
 | 模式 | 说明 |
 |---|---|
 | **Demo Mode** | 本地规则模拟，稳定演示完整链路 |
-| **Live Mode** | 经服务端 Proxy 调用 Gemini 3.6 Flash + Google Search Grounding（访客无需填 Key） |
+| **Live Mode** | 经服务端 Proxy 调用 Gemini 2.5 Flash + Google Search Grounding（访客无需填 Key） |
 
 试运行任务：
 
@@ -158,7 +158,7 @@ PRODUCT_SPEC.md + module docs      # 产品与设计说明
 
 ## Roadmap
 
-- [x] Gemini 3.6 Flash Planner / Synthesizer / Evaluator  
+- [x] Gemini 2.5 Flash Planner / Synthesizer / Evaluator  
 - [x] Gemini Google Search Grounding  
 - [x] 服务端 Proxy，支持分享链接直接 Live  
 - [x] GitHub Pages 在线 Demo  
