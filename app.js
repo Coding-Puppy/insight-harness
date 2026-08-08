@@ -49,7 +49,7 @@ const toolPolicies = {
     label: "LLM Reasoning",
     maxCalls: 2,
     allowedFor: ["synthesis", "reasoning", "prioritization", "final recommendation"],
-    reason: "用于综合判断、归纳和建议生成（Live Mode 使用 Gemini 2.5 Flash）",
+    reason: "用于综合判断、归纳和建议生成（Live Mode 使用 Gemini Flash（自动选择可用模型））",
   },
   calculator: {
     label: "Calculator",
@@ -200,7 +200,7 @@ function initConfigUi() {
   const hint = document.querySelector("#configHint");
   if (hint) {
     hint.textContent = proxyReady
-      ? "Live Mode 通过服务端 Proxy 调用 Gemini 2.5 Flash 与 Google Search Grounding，无需填写 Key。关闭后使用本地 Demo Mode。"
+      ? "Live Mode 通过服务端 Proxy 调用 Gemini Flash 与 Google Search Grounding，无需填写 Key。关闭后使用本地 Demo Mode。"
       : "当前未配置 Proxy，仅可使用 Demo Mode。请部署 worker/ 并在 config.public.js 填写 proxyUrl。";
   }
 
@@ -415,7 +415,7 @@ function validatePlan(plan, fallbackGoal) {
     goal: String(plan.goal || fallbackGoal).trim(),
     domain: String(plan.domain || inferDomain(fallbackGoal)).trim(),
     planning_strategy: String(plan.planning_strategy || "market_entry_research").trim(),
-    source: "gemini-2.5-flash",
+    source: "gemini-flash",
     tasks: normalizedTasks,
   };
 }
@@ -635,7 +635,7 @@ Return:
     resultCount: 1,
     evidence: {
       title: "Gemini intermediate synthesis",
-      source: "Gemini 2.5 Flash",
+      source: "Gemini Flash",
       insight: text,
     },
     summary: text,
@@ -824,7 +824,7 @@ Requirements:
     text: cleaned,
     observations,
     taskCount: plan.tasks.length,
-    source: "gemini-2.5-flash",
+    source: "gemini-flash",
   };
 }
 
@@ -942,7 +942,7 @@ function normalizeEvaluation(raw, plan, synthesis) {
     rubric: defaultRubric,
     issues: issues.length ? issues : decision === "pass" ? ["无明显阻断性问题"] : ["需要补充证据"],
     repairTask,
-    source: "gemini-2.5-flash",
+    source: "gemini-flash",
   };
 }
 
@@ -1078,7 +1078,7 @@ async function createPlan(goal) {
   }
 
   try {
-    await addTrace("planner", "Calling Gemini Planner", "model: gemini-2.5-flash", "•", 60);
+    await addTrace("planner", "Calling Gemini Planner", "model: gemini-flash", "•", 60);
     return await planWithGemini(goal);
   } catch (error) {
     await addTrace(
@@ -1144,7 +1144,7 @@ async function runHarness() {
   updateModeBadge();
 
   const modeLabel = canUseLiveMode()
-    ? "Live Mode via shared proxy: Gemini 2.5 Flash + Google Search Grounding"
+    ? "Live Mode via shared proxy: Gemini Flash + Google Search Grounding"
     : "Demo Mode: local rule-based simulation";
   await addTrace("system", "Harness mode", modeLabel, "•", 60);
 

@@ -1,5 +1,12 @@
-const GEMINI_MODEL = "gemini-2.5-flash";
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+// Preferred models for this project's API key profile:
+// - gemini-2.5-flash is blocked for many new keys
+// - free-tier quotas are per-model, so fallback helps when one model is rate-limited
+const GEMINI_MODELS = [
+  "gemini-3.6-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-2.0-flash",
+  "gemini-3.5-flash-lite",
+];
 
 // Simple in-memory rate limit (resets when the isolate recycles).
 const rateBuckets = new Map();
@@ -85,7 +92,7 @@ function buildGeminiBody(input) {
     ],
   };
 
-  // Gemini 3.x ignores/deprecates temperature; only set JSON mime when needed.
+  // Keep generationConfig minimal for Gemini 3.x compatibility.
   if (input.json) {
     body.generationConfig = {
       responseMimeType: "application/json",
@@ -111,6 +118,28 @@ function getResponseText(payload) {
     .map((part) => part.text || "")
     .join("\n")
     .trim();
+}
+
+function shouldTryNextModel(status, message) {
+  const text = String(message || "").toLowerCase();
+  if (status === 404) return true;
+  if (status === 429) return true;
+  if (text.includes("no longer available")) return true;
+  if (text.includes("not found")) return true;
+  if (text.includes("quota exceeded")) return true;
+  if (text.includes("rate limit")) return true;
+  return false;
+}
+
+async function callGeminiModel(apiKey, model, geminiBody) {
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+  const upstream = await fetch(`${endpoint}?key=${encodeURIComponent(apiKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(geminiBody),
+  });
+  const payload = await upstream.json().catch(() => ({}));
+  return { upstream, payload, model };
 }
 
 async function handleGemini(request, env, origin) {
@@ -152,36 +181,47 @@ async function handleGemini(request, env, origin) {
     return jsonResponse({ error: error.message || String(error) }, 400, origin, env);
   }
 
-  const upstream = await fetch(`${GEMINI_ENDPOINT}?key=${encodeURIComponent(env.GEMINI_API_KEY)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(geminiBody),
-  });
+  const attempts = [];
+  let lastError = null;
+  let lastStatus = 500;
 
-  const payload = await upstream.json().catch(() => ({}));
-  if (!upstream.ok) {
-    return jsonResponse(
-      {
-        error: payload?.error?.message || `Gemini API error (${upstream.status})`,
-        status: upstream.status,
-      },
-      upstream.status,
-      origin,
-      env,
-    );
+  for (const model of GEMINI_MODELS) {
+    const { upstream, payload } = await callGeminiModel(env.GEMINI_API_KEY, model, geminiBody);
+    if (upstream.ok) {
+      return jsonResponse(
+        {
+          text: getResponseText(payload),
+          groundingMetadata: payload?.candidates?.[0]?.groundingMetadata || null,
+          payload,
+          meta: {
+            model,
+            tried: attempts.concat(model),
+            remaining: rate.remaining,
+          },
+        },
+        200,
+        origin,
+        env,
+      );
+    }
+
+    const message = payload?.error?.message || `Gemini API error (${upstream.status})`;
+    attempts.push({ model, status: upstream.status, message });
+    lastError = message;
+    lastStatus = upstream.status;
+
+    if (!shouldTryNextModel(upstream.status, message)) {
+      break;
+    }
   }
 
   return jsonResponse(
     {
-      text: getResponseText(payload),
-      groundingMetadata: payload?.candidates?.[0]?.groundingMetadata || null,
-      payload,
-      meta: {
-        model: GEMINI_MODEL,
-        remaining: rate.remaining,
-      },
+      error: lastError || "All Gemini models failed",
+      status: lastStatus,
+      tried: attempts,
     },
-    200,
+    lastStatus || 500,
     origin,
     env,
   );
@@ -201,7 +241,8 @@ export default {
         {
           ok: true,
           service: "insight-harness-proxy",
-          model: GEMINI_MODEL,
+          models: GEMINI_MODELS,
+          primaryModel: GEMINI_MODELS[0],
           hasKey: Boolean(env.GEMINI_API_KEY),
         },
         200,
