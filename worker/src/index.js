@@ -1,11 +1,12 @@
 // Preferred models for this project's API key profile:
 // - gemini-2.5-flash is blocked for many new keys
-// - free-tier quotas are per-model, so fallback helps when one model is rate-limited
+// - gemini-3.5-flash-lite is usually the cheapest/free-tier friendly option
+// - free-tier quotas are per-model, so fallback helps when one model is unavailable
 const GEMINI_MODELS = [
-  "gemini-3.6-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-2.0-flash",
   "gemini-3.5-flash-lite",
+  "gemini-2.0-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-3.6-flash",
 ];
 
 // Simple in-memory rate limit (resets when the isolate recycles).

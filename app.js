@@ -49,7 +49,7 @@ const toolPolicies = {
     label: "LLM Reasoning",
     maxCalls: 2,
     allowedFor: ["synthesis", "reasoning", "prioritization", "final recommendation"],
-    reason: "用于综合判断、归纳和建议生成（Live Mode 使用 Gemini Flash（自动选择可用模型））",
+    reason: "用于综合判断、归纳和建议生成（Live Mode 使用 Gemini 3.5 Flash-Lite（不足时自动降级））",
   },
   calculator: {
     label: "Calculator",
@@ -200,7 +200,7 @@ function initConfigUi() {
   const hint = document.querySelector("#configHint");
   if (hint) {
     hint.textContent = proxyReady
-      ? "Live Mode 通过服务端 Proxy 调用 Gemini Flash 与 Google Search Grounding，无需填写 Key。关闭后使用本地 Demo Mode。"
+      ? "Live Mode 通过服务端 Proxy 调用 Gemini 3.5 Flash-Lite 与 Google Search Grounding，无需填写 Key。关闭后使用本地 Demo Mode。"
       : "当前未配置 Proxy，仅可使用 Demo Mode。请部署 worker/ 并在 config.public.js 填写 proxyUrl。";
   }
 
@@ -1144,7 +1144,7 @@ async function runHarness() {
   updateModeBadge();
 
   const modeLabel = canUseLiveMode()
-    ? "Live Mode via shared proxy: Gemini Flash + Google Search Grounding"
+    ? "Live Mode via shared proxy: Gemini 3.5 Flash-Lite + Google Search Grounding"
     : "Demo Mode: local rule-based simulation";
   await addTrace("system", "Harness mode", modeLabel, "•", 60);
 
