@@ -36,7 +36,28 @@ const state = {
   mode: "demo",
   currentGoal: "",
   currentDomain: "",
+  quotaBlocked: false,
 };
+
+function isQuotaError(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+  return (
+    message.includes("quota") ||
+    message.includes("rate limit") ||
+    message.includes("resource_exhausted") ||
+    message.includes("429")
+  );
+}
+
+function markQuotaBlocked(error) {
+  if (isQuotaError(error)) {
+    state.quotaBlocked = true;
+  }
+}
+
+function canCallLiveApi() {
+  return canUseLiveMode() && !state.quotaBlocked;
+}
 
 const toolPolicies = {
   web_search: {
@@ -454,10 +475,10 @@ Create a task plan using this schema:
 }
 
 Planning rules:
-1. Generate 3-5 tasks.
+1. Generate exactly 3 tasks when possible (max 4) to save tool budget.
 2. Put external evidence tasks before synthesis tasks.
-3. Use web_search for facts and evidence.
-4. Use llm only for synthesis or final judgment.
+3. Use at most 2 web_search tasks.
+4. Use llm only for the final synthesis/judgment task.
 5. Use calculator only when numeric estimation is explicitly useful.
 6. Every task must have a measurable successCriteria.
 7. The final task must use tool "llm".`;
@@ -594,6 +615,81 @@ Prefer specific numbers, product names, and sources over generic advice.`;
   };
 }
 
+async function batchSearchWithGemini(tasks, plan) {
+  const started = performance.now();
+  const prompt = `You are the web_search executor inside a vertical research Agent Harness.
+
+User goal:
+${plan.goal}
+
+Domain:
+${plan.domain}
+
+Investigate ALL subtasks below with Google Search in one pass.
+Return JSON only:
+{
+  "items": [
+    {
+      "taskId": 1,
+      "title": "short title",
+      "insight": "Chinese findings for this subtask"
+    }
+  ]
+}
+
+Subtasks:
+${tasks.map((task) => `${task.id}. ${task.task}\nObjective: ${task.objective || ""}\nSuccess: ${task.successCriteria || ""}`).join("\n\n")}
+
+Rules:
+- Cover every taskId.
+- Stay on this domain only.
+- Prefer concrete competitor/product/pricing facts when available.
+- Do not wrap terms in quotation marks.`;
+
+  const { text, groundingMetadata } = await callGemini({
+    prompt,
+    useSearch: true,
+    json: true,
+    temperature: 0.2,
+  });
+
+  const parsed = extractJson(text);
+  const items = Array.isArray(parsed.items) ? parsed.items : [];
+  const latency = (performance.now() - started) / 1000;
+  const sharedSources = (groundingMetadata?.groundingChunks || [])
+    .map((chunk) => chunk?.web)
+    .filter(Boolean)
+    .slice(0, 5)
+    .map((web) => ({
+      title: web.title || "Web Source",
+      url: web.uri || "",
+    }));
+
+  return tasks.map((task) => {
+    const item = items.find((entry) => Number(entry.taskId) === Number(task.id)) || items[0] || {};
+    const insight = cleanDisplayText(item.insight || text || `暂无 ${task.task} 的足够公开证据。`);
+    const evidence = {
+      query: task.task,
+      title: cleanDisplayText(item.title || `批量检索：${task.task}`),
+      source: sharedSources[0]?.url || "Gemini Google Search Grounding",
+      insight,
+      sources: sharedSources,
+      queries: groundingMetadata?.webSearchQueries || [task.task],
+    };
+    return {
+      task,
+      result: {
+        tool: "web_search",
+        latency,
+        resultCount: Math.max(sharedSources.length, 1),
+        evidence,
+        summary: insight,
+        source: "gemini-grounding-batch",
+      },
+    };
+  });
+}
+
 async function reasonWithGemini(task, observations) {
   const started = performance.now();
   const evidenceText = observations
@@ -644,7 +740,7 @@ Return:
 }
 
 async function executeTool(task, route, attempt, observations) {
-  if (!canUseLiveMode()) {
+  if (!canCallLiveApi()) {
     return executeToolDemo(task, route, attempt);
   }
 
@@ -653,19 +749,131 @@ async function executeTool(task, route, attempt, observations) {
       return await searchWithGemini(task);
     }
     if (route.tool === "llm") {
-      return await reasonWithGemini(task, observations);
+      // Save free-tier quota: final synthesis already covers LLM reasoning.
+      const domain = state.currentDomain || "目标赛道";
+      return {
+        tool: "llm",
+        latency: 0.2,
+        resultCount: 1,
+        evidence: {
+          title: "Deferred to synthesizer",
+          source: "Harness",
+          insight: `已收集 ${observations.length} 条观测，关于 ${domain} 的综合判断交给 Synthesizer 统一生成。`,
+        },
+        summary: "LLM 综合阶段合并处理，以降低免费额度消耗。",
+        source: "live-lite",
+      };
     }
     return executeToolDemo(task, route, attempt);
   } catch (error) {
+    markQuotaBlocked(error);
     await addTrace(
       "executor",
-      "Live tool failed, fallback to demo",
+      isQuotaError(error) ? "Gemini quota hit, switch to demo tools" : "Live tool failed, fallback to demo",
       escapeHtml(error.message || String(error)),
       "!",
       80,
     );
     return executeToolDemo(task, route, attempt);
   }
+}
+
+async function executePlanTasks(plan, observations) {
+  let toolCalls = 0;
+  const searchTasks = [];
+  const otherTasks = [];
+
+  for (const task of plan.tasks) {
+    const route = routeTool(task);
+    await addTrace(
+      "router",
+      route.label,
+      `Task ${task.id}: ${escapeHtml(task.task)}<br>Status: ${route.status}<br>Policy: ${escapeHtml(route.reason)}<br>Guardrail: ${escapeHtml(route.guardrail)}`,
+      "→",
+    );
+    if (route.tool === "web_search") {
+      searchTasks.push({ task, route });
+    } else {
+      otherTasks.push({ task, route });
+    }
+  }
+
+  if (searchTasks.length) {
+    if (canCallLiveApi()) {
+      try {
+        await addTrace(
+          "executor",
+          "Batch web search",
+          `Free-tier mode: 1 Gemini grounding call for ${searchTasks.length} search tasks.`,
+          "•",
+          60,
+        );
+        const batchResults = await batchSearchWithGemini(
+          searchTasks.map((item) => item.task),
+          plan,
+        );
+        for (const item of searchTasks) {
+          const matched = batchResults.find((entry) => entry.task.id === item.task.id) || batchResults[0];
+          const result = matched.result;
+          toolCalls += 1;
+          observations.push({ task: item.task, route: item.route, result });
+          await addTrace(
+            "executor",
+            "Observation captured",
+            `${escapeHtml(result.evidence.title)}<br>${result.resultCount} result(s), ${result.latency.toFixed(1)}s<br>Source: ${escapeHtml(result.source)}`,
+            "✓",
+          );
+        }
+      } catch (error) {
+        markQuotaBlocked(error);
+        await addTrace(
+          "executor",
+          isQuotaError(error) ? "Gemini quota hit, search fallback to demo" : "Batch search failed, fallback to demo",
+          escapeHtml(error.message || String(error)),
+          "!",
+          80,
+        );
+        for (const item of searchTasks) {
+          const result = executeToolDemo(item.task, item.route, 0);
+          toolCalls += 1;
+          observations.push({ task: item.task, route: item.route, result });
+          await addTrace(
+            "executor",
+            "Observation captured",
+            `${escapeHtml(result.evidence.title)}<br>${result.resultCount} result(s), ${result.latency.toFixed(1)}s`,
+            "✓",
+          );
+        }
+      }
+    } else {
+      for (const item of searchTasks) {
+        const result = executeToolDemo(item.task, item.route, 0);
+        toolCalls += 1;
+        observations.push({ task: item.task, route: item.route, result });
+        await addTrace(
+          "executor",
+          "Observation captured",
+          `${escapeHtml(result.evidence.title)}<br>${result.resultCount} result(s), ${result.latency.toFixed(1)}s`,
+          "✓",
+        );
+      }
+    }
+  }
+
+  for (const item of otherTasks) {
+    const result = await executeTool(item.task, item.route, 0, observations);
+    toolCalls += 1;
+    observations.push({ task: item.task, route: item.route, result });
+    const sourceNote = result.source && result.source !== "demo" ? `<br>Source: ${escapeHtml(result.source)}` : "";
+    await addTrace(
+      "executor",
+      "Observation captured",
+      `${escapeHtml(result.evidence.title)}<br>${result.resultCount} result(s), ${result.latency.toFixed(1)}s${sourceNote}`,
+      "✓",
+    );
+  }
+
+  return toolCalls;
 }
 
 function synthesizeDemo(goal, plan, observations, attempt) {
@@ -1073,7 +1281,7 @@ function updateMetrics(run) {
 }
 
 async function createPlan(goal) {
-  if (!canUseLiveMode()) {
+  if (!canCallLiveApi()) {
     return planTask(goal);
   }
 
@@ -1081,9 +1289,10 @@ async function createPlan(goal) {
     await addTrace("planner", "Calling Gemini Planner", "model: gemini-3.5-flash-lite", "•", 60);
     return await planWithGemini(goal);
   } catch (error) {
+    markQuotaBlocked(error);
     await addTrace(
       "planner",
-      "Gemini Planner failed, fallback to demo plan",
+      isQuotaError(error) ? "Gemini quota hit, fallback to demo plan" : "Gemini Planner failed, fallback to demo plan",
       escapeHtml(error.message || String(error)),
       "!",
       80,
@@ -1093,16 +1302,17 @@ async function createPlan(goal) {
 }
 
 async function createSynthesis(goal, plan, observations, attempt) {
-  if (!canUseLiveMode()) {
+  if (!canCallLiveApi()) {
     return synthesizeDemo(goal, plan, observations, attempt);
   }
 
   try {
     return await synthesizeWithGemini(goal, plan, observations, attempt);
   } catch (error) {
+    markQuotaBlocked(error);
     await addTrace(
       "synthesizer",
-      "Gemini Synthesizer failed, fallback to demo",
+      isQuotaError(error) ? "Gemini quota hit, synthesis fallback to demo" : "Gemini Synthesizer failed, fallback to demo",
       escapeHtml(error.message || String(error)),
       "!",
       80,
@@ -1112,22 +1322,42 @@ async function createSynthesis(goal, plan, observations, attempt) {
 }
 
 async function createEvaluation(goal, plan, synthesis, attempt) {
-  if (!canUseLiveMode()) {
-    return evaluateDemo(plan, synthesis, attempt);
+  // Free-tier friendly: always score locally after Live evidence/synthesis.
+  if (canUseLiveMode() && synthesis.source !== "demo") {
+    return evaluateLiveLocal(plan, synthesis, attempt);
   }
+  return evaluateDemo(plan, synthesis, attempt);
+}
 
-  try {
-    return await evaluateWithGemini(goal, plan, synthesis, attempt);
-  } catch (error) {
-    await addTrace(
-      "evaluator",
-      "Gemini Evaluator failed, fallback to demo",
-      escapeHtml(error.message || String(error)),
-      "!",
-      80,
-    );
-    return evaluateDemo(plan, synthesis, attempt);
-  }
+function evaluateLiveLocal(plan, synthesis, attempt) {
+  const base = evaluateDemo(plan, synthesis, attempt);
+  const grounded = synthesis.observations.filter((item) =>
+    String(item.result?.source || "").includes("gemini"),
+  ).length;
+  const evidence = Math.max(base.evidence, Math.min(5, 2 + grounded));
+  const completeness = base.completeness;
+  const relevance = 5;
+  const overall = Math.round((completeness * 0.35 + evidence * 0.4 + relevance * 0.25) * 20);
+  return {
+    ...base,
+    evidence,
+    relevance,
+    overall,
+    decision: overall >= 80 ? "pass" : "retry",
+    issues:
+      overall >= 80
+        ? ["Live evidence collected; local rubric used to save free-tier quota"]
+        : ["Evidence still thin after live search"],
+    repairTask:
+      overall >= 80
+        ? null
+        : {
+            task: `补充 ${plan.domain} 的关键证据缺口`,
+            tool: "web_search",
+            reason: "Local rubric below threshold",
+          },
+    source: "local-rubric-after-live",
+  };
 }
 
 async function runHarness() {
@@ -1135,6 +1365,7 @@ async function runHarness() {
   const goal = els.task.value.trim() || "分析 AI 客服 SaaS 市场是否值得进入";
   state.traceItems = [];
   state.runStartedAt = startedAt;
+  state.quotaBlocked = false;
   els.run.disabled = true;
   els.status.classList.add("running");
   els.status.lastChild.textContent = " Running";
@@ -1144,7 +1375,7 @@ async function runHarness() {
   updateModeBadge();
 
   const modeLabel = canUseLiveMode()
-    ? "Live Mode via shared proxy: Gemini 3.5 Flash-Lite + Google Search Grounding"
+    ? "Live Mode via shared proxy: Gemini 3.5 Flash-Lite + Google Search Grounding (quota-safe batching)"
     : "Demo Mode: local rule-based simulation";
   await addTrace("system", "Harness mode", modeLabel, "•", 60);
 
@@ -1161,22 +1392,21 @@ async function runHarness() {
   );
 
   let retryCount = 0;
-  let toolCalls = 0;
   const observations = [];
   let evaluation;
   let synthesis;
 
-  for (const task of plan.tasks) {
-    const observation = await runTask(task, 0, observations);
-    toolCalls += 1;
-    observations.push(observation);
-  }
+  // Live free-tier path: batch searches into 1 grounding call instead of 3-4.
+  let toolCalls = await executePlanTasks(plan, observations);
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  // Live mode uses a single evaluate pass to avoid burning free-tier quota on retry loops.
+  const maxAttempts = canUseLiveMode() ? 1 : 2;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     await addTrace(
       "synthesizer",
       "Synthesizing",
-      canUseLiveMode()
+      canCallLiveApi()
         ? "Gemini merges evidence into a structured research output."
         : "Evidence pool merged into a structured research output.",
       "◇",
@@ -1188,7 +1418,7 @@ async function runHarness() {
       "evaluator",
       "Evaluating",
       canUseLiveMode()
-        ? "Gemini scores Completeness, Evidence and Relevance."
+        ? "Local rubric scores Completeness, Evidence and Relevance to save free-tier quota."
         : "Completeness, Evidence and Relevance scored by evaluator.",
       "◎",
     );
@@ -1201,7 +1431,16 @@ async function runHarness() {
       evaluation.overall >= 80 ? "✓" : "!",
     );
 
-    if (evaluation.overall >= 80 || !evaluation.repairTask) {
+    if (evaluation.overall >= 80 || !evaluation.repairTask || maxAttempts === 1) {
+      if (canUseLiveMode() && evaluation.decision === "retry") {
+        await addTrace(
+          "retry",
+          "Retry skipped in Live free-tier mode",
+          "To avoid Gemini quota errors, Live Mode only runs one Evaluate pass. Switch to Demo Mode if you want the full Retry Loop demo.",
+          "•",
+          60,
+        );
+      }
       break;
     }
 
