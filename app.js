@@ -68,7 +68,7 @@ function buildDemoEvidence(task, attempt) {
       query: `${domain} pricing competitors billing`,
       title: `补充 ${domain} 竞品价格与计费方式证据`,
       source: "Repair Search",
-      insight: `围绕「${domain}」补充公开定价/套餐信息后可见：头部玩家多按席位、用量或功能包分层收费；新进入者更适合用垂直场景模板、部署速度或可观测效果证明差异化，而不是正面硬刚通用大盘。`,
+      insight: `围绕 ${domain} 补充公开定价/套餐信息后可见：头部玩家多按席位、用量或功能包分层收费；新进入者更适合用垂直场景模板、部署速度或可观测效果证明差异化，而不是正面硬刚通用大盘。`,
     };
   }
 
@@ -77,25 +77,25 @@ function buildDemoEvidence(task, attempt) {
       query: `${domain} market growth demand`,
       title: `${domain}：需求从尝鲜转向可规模化落地`,
       source: "Market Scan",
-      insight: `「${topic}」相关需求正在从概念验证走向预算化采购，买家更关心降本增效、流程嵌入和可量化结果，而不是单点演示效果。`,
+      insight: `${topic} 相关需求正在从概念验证走向预算化采购，买家更关心降本增效、流程嵌入和可量化结果，而不是单点演示效果。`,
     },
     {
       query: `${domain} user pain points`,
       title: `${domain}：用户痛点转向可控、可集成、可评估`,
       source: "User Review Digest",
-      insight: `围绕「${domain}」，用户常见诉求包括结果稳定性、系统集成、权限边界、更新维护成本，以及对效果可追溯/可质检的要求。`,
+      insight: `围绕 ${domain}，用户常见诉求包括结果稳定性、系统集成、权限边界、更新维护成本，以及对效果可追溯/可质检的要求。`,
     },
     {
       query: `${domain} competitors pricing`,
       title: `${domain}：竞争已从功能清单转向包装与计费`,
       source: "Competitor Desk",
-      insight: `「${domain}」赛道已有通用型与垂直型玩家。公开信息里价格/套餐口径往往不完整，需要继续核对竞品定位、计费方式和替换成本。`,
+      insight: `${domain} 赛道已有通用型与垂直型玩家。公开信息里价格/套餐口径往往不完整，需要继续核对竞品定位、计费方式和替换成本。`,
     },
     {
       query: `${domain} business model entry opportunity`,
       title: `${domain}：进入机会更可能在垂直切口`,
       source: "Buyer Notes",
-      insight: `对「${domain}」而言，更稳的进入路径通常不是做全能平台，而是抓住高痛点细分场景，用更快上线、更深工作流绑定或更强可观测性建立差异。`,
+      insight: `对 ${domain} 而言，更稳的进入路径通常不是做全能平台，而是抓住高痛点细分场景，用更快上线、更深工作流绑定或更强可观测性建立差异。`,
     },
   ];
 
@@ -114,6 +114,24 @@ function nowTime() {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+function cleanDisplayText(value) {
+  let text = String(value ?? "");
+
+  // Normalize fancy quotes, then strip decorative quoting from report text.
+  text = text
+    .replace(/[“”„‟]/g, '"')
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/「([^」\n]{1,120})」/g, "$1")
+    .replace(/『([^』\n]{1,120})』/g, "$1")
+    .replace(/"([^"\n]{1,120})"/g, "$1")
+    .replace(/'([^'\n]{1,120})'/g, "$1")
+    .replace(/["']/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  return text;
 }
 
 function escapeHtml(value) {
@@ -504,9 +522,9 @@ function executeToolDemo(task, route, attempt) {
     evidence: {
       title: "Synthesis",
       source: "LLM",
-      insight: `综合「${domain}」相关证据后，给出市场进入判断、目标客群和产品策略。`,
+      insight: `综合 ${domain} 相关证据后，给出市场进入判断、目标客群和产品策略。`,
     },
-    summary: `结合「${domain}」的需求、竞品和商业模式形成进入建议。`,
+    summary: `结合 ${domain} 的需求、竞品和商业模式形成进入建议。`,
     source: "demo",
   };
 }
@@ -648,40 +666,40 @@ async function executeTool(task, route, attempt, observations) {
 }
 
 function synthesizeDemo(goal, plan, observations, attempt) {
-  const domain = escapeHtml(plan.domain || state.currentDomain || inferDomain(goal));
-  const safeGoal = escapeHtml(goal);
+  const domain = escapeHtml(cleanDisplayText(plan.domain || state.currentDomain || inferDomain(goal)));
+  const safeGoal = escapeHtml(cleanDisplayText(goal));
   const snippets = observations
-    .map((item) => item.result?.evidence?.insight || item.result?.summary || "")
+    .map((item) => cleanDisplayText(item.result?.evidence?.insight || item.result?.summary || ""))
     .filter(Boolean)
     .slice(0, 3);
   const evidenceLine = snippets.length
     ? snippets.map((item) => escapeHtml(item)).join(" ")
-    : `目前仅有关于「${domain}」的初步信号，仍需补充更具体的公开证据。`;
+    : `目前仅有关于 ${domain} 的初步信号，仍需补充更具体的公开证据。`;
 
   const competitorDepth =
     attempt === 0
-      ? `竞品与价格信息仍偏粗，需要继续核实「${domain}」头部玩家的定位、套餐和替换成本。`
-      : `已补充更多「${domain}」竞品包装/计费线索，可支撑更稳的定位判断，但仍建议交叉验证一手资料。`;
+      ? `竞品与价格信息仍偏粗，需要继续核实 ${domain} 头部玩家的定位、套餐和替换成本。`
+      : `已补充更多 ${domain} 竞品包装/计费线索，可支撑更稳的定位判断，但仍建议交叉验证一手资料。`;
   const recommendation =
     attempt === 0
-      ? `对「${domain}」建议谨慎进入，先补足竞品与证据缺口。`
-      : `「${domain}」值得以垂直切口试探进入，但不建议一上来做全能横向平台。`;
+      ? `对 ${domain} 建议谨慎进入，先补足竞品与证据缺口。`
+      : `${domain} 值得以垂直切口试探进入，但不建议一上来做全能横向平台。`;
 
   const text = [
     `01 市场机会`,
-    `${safeGoal}。围绕「${domain}」，机会更可能来自可规模化降本、流程嵌入和可量化结果，而不是单点功能演示。`,
+    `${safeGoal}。围绕 ${domain}，机会更可能来自可规模化降本、流程嵌入和可量化结果，而不是单点功能演示。`,
     `02 用户痛点`,
     `买家关注稳定性、集成成本、权限边界、维护负担，以及效果是否可评估、可追溯。`,
     `03 核心竞品`,
     `${evidenceLine} ${competitorDepth}`,
     `04 进入建议`,
-    `${recommendation} 更稳的产品叙事是：针对「${domain}」做可调度、可观测、可迭代的 Agent Harness，而不是只输出一段答案。`,
+    `${recommendation} 更稳的产品叙事是：针对 ${domain} 做可调度、可观测、可迭代的 Agent Harness，而不是只输出一段答案。`,
   ].join("\n\n");
 
   return {
     html: `
       <h3>01 市场机会</h3>
-      <p>${safeGoal}。围绕「${domain}」，机会更可能来自可规模化降本、流程嵌入和可量化结果，而不是单点功能演示。</p>
+      <p>${safeGoal}。围绕 ${domain}，机会更可能来自可规模化降本、流程嵌入和可量化结果，而不是单点功能演示。</p>
       <ul>
         <li>优先验证：谁有预算、谁有高频痛点、谁愿意为可观测效果付费。</li>
         <li>高价值切入：能嵌入现有工作流、缩短上线周期、并能证明 ROI 的细分场景。</li>
@@ -694,9 +712,9 @@ function synthesizeDemo(goal, plan, observations, attempt) {
       <p>${evidenceLine} ${competitorDepth}</p>
 
       <h3>04 进入建议</h3>
-      <p>${recommendation} 更稳的产品叙事是：针对「${domain}」做可调度、可观测、可迭代的 Agent Harness，而不是只输出一段答案。</p>
+      <p>${recommendation} 更稳的产品叙事是：针对 ${domain} 做可调度、可观测、可迭代的 Agent Harness，而不是只输出一段答案。</p>
     `,
-    text,
+    text: cleanDisplayText(text.replace(/&quot;/g, '"').replace(/&#039;/g, "'")),
     observations,
     taskCount: plan.tasks.length,
     source: "demo",
@@ -704,7 +722,7 @@ function synthesizeDemo(goal, plan, observations, attempt) {
 }
 
 function markdownishToHtml(text) {
-  const escaped = escapeHtml(text || "");
+  const escaped = escapeHtml(cleanDisplayText(text || ""));
   const blocks = escaped.split(/\n{2,}/).filter(Boolean);
 
   return blocks
@@ -773,6 +791,7 @@ Requirements:
 - Stay strictly on the user's goal and domain. Do NOT reuse unrelated examples.
 - Do NOT mention Intercom / Zendesk / Ada / Gorgias / AI客服 unless they truly appear in the evidence pool or the user goal.
 - Be specific and evidence-based; name only competitors supported by the evidence.
+- Do not wrap terms, company names, or section phrases in quotation marks (" ", “ ”, 「 」).
 - Mention uncertainties explicitly.
 - If evidence about pricing/competitors is thin, say so clearly.
 - End with a clear go / cautious / no-go style recommendation for THIS domain.`;
@@ -781,10 +800,11 @@ Requirements:
     prompt,
     temperature: 0.4,
   });
+  const cleaned = cleanDisplayText(text);
 
   return {
-    html: markdownishToHtml(text),
-    text,
+    html: markdownishToHtml(cleaned),
+    text: cleaned,
     observations,
     taskCount: plan.tasks.length,
     source: "gemini-3.6-flash",
