@@ -120,7 +120,9 @@ function cleanDisplayText(value) {
   let text = String(value ?? "");
 
   // Normalize fancy quotes, then strip decorative quoting from report text.
+  // Keep newlines so section headings (01/02/03/04) can still be parsed.
   text = text
+    .replace(/\r\n/g, "\n")
     .replace(/[“”„‟]/g, '"')
     .replace(/[‘’‚‛]/g, "'")
     .replace(/「([^」\n]{1,120})」/g, "$1")
@@ -128,7 +130,8 @@ function cleanDisplayText(value) {
     .replace(/"([^"\n]{1,120})"/g, "$1")
     .replace(/'([^'\n]{1,120})'/g, "$1")
     .replace(/["']/g, "")
-    .replace(/\s{2,}/g, " ")
+    .replace(/[^\S\n]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 
   return text;
@@ -722,25 +725,36 @@ function synthesizeDemo(goal, plan, observations, attempt) {
 }
 
 function markdownishToHtml(text) {
-  const escaped = escapeHtml(cleanDisplayText(text || ""));
-  const blocks = escaped.split(/\n{2,}/).filter(Boolean);
+  const cleaned = cleanDisplayText(text || "");
+  // Prefer splitting by numbered section headers so 01-04 stay separated
+  // even when the model returns single newlines instead of blank lines.
+  const sectionChunks = cleaned
+    .split(/(?=^\s*(?:#{1,3}\s*)?(?:0[1-4]|[1-4])[\.、\s]+)/m)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean);
+
+  const blocks = sectionChunks.length > 1 ? sectionChunks : cleaned.split(/\n{2,}/).filter(Boolean);
 
   return blocks
     .map((block) => {
-      const lines = block.split("\n");
-      if (lines.every((line) => /^[-*•]\s+/.test(line.trim()) || !line.trim())) {
-        const items = lines
-          .filter((line) => line.trim())
-          .map((line) => `<li>${line.replace(/^[-*•]\s+/, "")}</li>`)
-          .join("");
+      const escapedBlock = escapeHtml(block);
+      const lines = escapedBlock.split("\n").map((line) => line.trim()).filter(Boolean);
+      if (!lines.length) return "";
+
+      if (lines.every((line) => /^[-*•]\s+/.test(line))) {
+        const items = lines.map((line) => `<li>${line.replace(/^[-*•]\s+/, "")}</li>`).join("");
         return `<ul>${items}</ul>`;
       }
 
-      if (/^\d+\.\s+/.test(lines[0].trim()) && lines.length === 1) {
-        return `<h3>${lines[0].replace(/^\d+\.\s+/, "")}</h3>`;
+      const headingMatch = lines[0].match(/^(?:#{1,3}\s*)?(?:0?([1-4])[\.、\s]+)(.+)$/);
+      if (headingMatch) {
+        const index = headingMatch[1];
+        const title = headingMatch[2].replace(/^#+\s*/, "").trim();
+        const body = lines.slice(1).join("<br>");
+        return `<h3>0${index} ${title}</h3>${body ? `<p>${body}</p>` : ""}`;
       }
 
-      if (/^(#{1,3}\s+|0\d\s)/.test(lines[0].trim()) || /^(市场|用户|竞品|进入|结论|建议)/.test(lines[0])) {
+      if (/^(市场|用户|竞品|进入|结论|建议)/.test(lines[0])) {
         return `<h3>${lines[0].replace(/^#+\s*/, "")}</h3>${
           lines.length > 1 ? `<p>${lines.slice(1).join("<br>")}</p>` : ""
         }`;
@@ -781,11 +795,14 @@ ${attempt + 1}
 Evidence pool:
 ${evidenceText}
 
-Write a concise Chinese research report with these sections:
+Write a concise Chinese research report with these exact section headers on their own lines:
 01 市场机会
 02 用户痛点
 03 核心竞品
 04 进入建议
+
+Put a blank line before each section header.
+Do not merge all sections into one paragraph.
 
 Requirements:
 - Stay strictly on the user's goal and domain. Do NOT reuse unrelated examples.
