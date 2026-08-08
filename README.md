@@ -68,7 +68,7 @@ python3 -m http.server 8080
 
 ### 2) 分享链接也能用 Live（方案 C：服务端 Proxy）
 
-目标：面试官点开 GitHub Pages，**不用填 Key** 就能跑联网版。
+目标：访客打开 GitHub Pages，**不用填 Key** 就能跑联网版。
 
 ```text
 Browser (Pages)
@@ -127,7 +127,7 @@ flowchart LR
 | Retry | `runRepairTask()` | 固定补证据 | 按缺口动态补搜 |
 | Feedback | localStorage | 导出 CSV | 导出 CSV |
 
-## Harness 四能力（面试一页纸）
+## Harness 四能力
 
 1. **任务调度**：Planner 不直接答题，只产出带 `tool / successCriteria` 的任务 JSON  
 2. **工具管控**：Router 检查合法性、调用上限、fallback；模型建议 ≠ 直接执行  
@@ -139,7 +139,7 @@ flowchart LR
 | 文档 | 用途 |
 |---|---|
 | [PRODUCT_SPEC.md](./PRODUCT_SPEC.md) | 产品规格 |
-| [DEMO_SCRIPT.md](./DEMO_SCRIPT.md) | 1/3 分钟演示话术 |
+| [DEMO_SCRIPT.md](./DEMO_SCRIPT.md) | 演示说明 |
 | [worker/README.md](./worker/README.md) | 可分享 Live Proxy 部署 |
 | [PLANNER.md](./PLANNER.md) / [PLANNER_PROMPT.md](./PLANNER_PROMPT.md) | 任务调度设计 |
 | [TOOL_ROUTER.md](./TOOL_ROUTER.md) | 工具管控 |

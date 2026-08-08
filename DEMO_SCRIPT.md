@@ -1,10 +1,10 @@
 # Demo Script
 
-这份文档用于投递、面试或 GitHub 项目演示。
+这份文档用于项目演示说明。
 
 ## Demo Goal
 
-向面试官展示：Insight Harness 不是一个 ChatGPT Clone，而是一个围绕垂直行业研究任务设计的 Agent Harness Console。
+展示 Insight Harness 不是一个 ChatGPT Clone，而是一个围绕垂直行业研究任务设计的 Agent Harness Console。
 
 核心展示点：
 
@@ -108,19 +108,17 @@ Retry Loop = 闭环迭代
 
 > 自动评分之外，我也保留了用户反馈入口。用户可以标记 Useful 或 Needs Improvement，并填写反馈，系统可以导出 CSV。这个反馈可以用于后续 Prompt、工具策略和评估阈值优化。
 
-## Key Interview Lines
+## Key Points
 
-可以背这几句：
-
-> 我关注的不是让模型生成一篇更漂亮的报告，而是让 Agent 的执行过程可调度、可管控、可观测、可迭代。
+> 项目关注的不是让模型生成一篇更漂亮的报告，而是让 Agent 的执行过程可调度、可管控、可观测、可迭代。
 
 > Planner 解决任务调度，Tool Router 解决工具管控，Execution Trace 和 Evaluator 解决效果观测，Retry Loop 和 Feedback 解决闭环迭代。
 
-> 我刻意没有做复杂多智能体、向量数据库或用户系统，因为这个项目的重点是把 Harness 的四个核心能力表达清楚。
+> 刻意没有做复杂多智能体、向量数据库或用户系统，因为重点是把 Harness 的四个核心能力表达清楚。
 
-> 当前版本用规则模拟核心链路，保证 Demo 稳定；文档里也补了 LLM Planner Prompt，后续可以替换成真实 LLM 输出结构化计划。
+> 当前版本同时支持规则模拟和 Live Mode；文档里也补了 LLM Planner Prompt 与校验规则。
 
-## Questions You May Be Asked
+## FAQ
 
 ### 为什么不做聊天界面？
 
@@ -132,8 +130,8 @@ Retry Loop = 闭环迭代
 
 ### 真实业务里 Planner 怎么实现？
 
-当前 Demo 用规则模拟，真实业务里可以用 LLM Planner。项目里有 `PLANNER_PROMPT.md`，定义了 System Prompt、JSON Schema 和校验规则。
+Demo Mode 可用规则模拟；Live Mode 可用 LLM Planner。项目里有 `PLANNER_PROMPT.md`，定义了 System Prompt、JSON Schema 和校验规则。
 
 ### 这个项目怎么继续做？
 
-优先接入真实搜索 API 和 LLM Planner，然后把 Trace、Feedback 保存到后端，再根据历史评分和用户反馈优化 Prompt、工具策略和 Evaluator 阈值。
+优先完善搜索与 Planner 稳定性，然后把 Trace、Feedback 保存到后端，再根据历史评分和用户反馈优化 Prompt、工具策略和 Evaluator 阈值。

@@ -102,9 +102,7 @@ Evaluate -> Diagnose Issue -> Create Repair Task -> Retry
 
 ## Product Explanation
 
-面试时可以这样讲：
-
-> Evaluator 是我设计的质量控制层。它会根据 Planner 的成功标准和最终输出，从完整度、证据度、相关性三个维度打分，并计算总分。当分数低于阈值时，Evaluator 不只是说结果不好，还会诊断问题并生成 Repair Task，驱动后续 Retry。这样 Harness 就从一次性生成变成了可评估、可修复的闭环系统。
+> Evaluator 是质量控制层。它会根据 Planner 的成功标准和最终输出，从完整度、证据度、相关性三个维度打分，并计算总分。当分数低于阈值时，Evaluator 不只是说结果不好，还会诊断问题并生成 Repair Task，驱动后续 Retry。这样 Harness 就从一次性生成变成了可评估、可修复的闭环系统。
 
 ## Future Improvements
 

@@ -87,9 +87,7 @@ execution-trace.json
 
 ## Product Explanation
 
-面试时可以这样讲：
-
-> Execution Trace 是我设计的可观测层。它会记录 Planner、Router、Executor、Evaluator 和 Retry 的关键事件，包括阶段、时间、耗时、工具选择原因、观测结果和评分。这样 Agent 不再是直接给答案的黑盒，而是一个可以被追踪、复盘和迭代的 Harness 流程。
+> Execution Trace 是可观测层。它会记录 Planner、Router、Executor、Evaluator 和 Retry 的关键事件，包括阶段、时间、耗时、工具选择原因、观测结果和评分。这样 Agent 不再是直接给答案的黑盒，而是一个可以被追踪、复盘和迭代的 Harness 流程。
 
 ## Future Improvements
 

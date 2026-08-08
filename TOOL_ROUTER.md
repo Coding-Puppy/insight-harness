@@ -95,9 +95,7 @@ const toolPolicies = {
 
 ## Product Explanation
 
-面试时可以这样讲：
-
-> Tool Router 是我设计的工具管控层。Planner 会给每个子任务建议工具，但 Harness 不会直接照单全收。Router 会检查工具是否合法，读取工具策略，记录调用原因和限制。如果 Planner 请求未知工具，系统会阻断并 fallback 到安全工具。这样可以让 Agent 的工具使用变得可控、可解释、可观测。
+> Tool Router 是工具管控层。Planner 会给每个子任务建议工具，但 Harness 不会直接照单全收。Router 会检查工具是否合法，读取工具策略，记录调用原因和限制。如果 Planner 请求未知工具，系统会阻断并 fallback 到安全工具。这样可以让 Agent 的工具使用变得可控、可解释、可观测。
 
 ## Future Improvements
 

@@ -80,9 +80,7 @@ Repair Task -> Tool Router -> Executor -> Observation -> Evidence Pool
 
 ## Product Explanation
 
-面试时可以这样讲：
-
-> Retry Loop 是我设计的闭环迭代层。当 Evaluator 判断结果低于阈值时，系统不会直接整体重写，而是根据低分原因生成一个 Repair Task，比如补充竞品价格证据。这个 Repair Task 会再次经过 Tool Router 和 Executor，新的证据进入 Evidence Pool 后再重新综合和评分。这样 Harness 就形成了 Evaluate -> Repair -> Re-evaluate 的质量闭环。
+> Retry Loop 是闭环迭代层。当 Evaluator 判断结果低于阈值时，系统不会直接整体重写，而是根据低分原因生成一个 Repair Task，比如补充竞品价格证据。这个 Repair Task 会再次经过 Tool Router 和 Executor，新的证据进入 Evidence Pool 后再重新综合和评分。这样 Harness 就形成了 Evaluate -> Repair -> Re-evaluate 的质量闭环。
 
 ## Future Improvements
 
