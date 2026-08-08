@@ -1,4 +1,5 @@
-const GEMINI_MODEL = "gemini-2.5-flash";
+// gemini-2.5-flash is unavailable to many new API keys; use the current Flash model.
+const GEMINI_MODEL = "gemini-3.6-flash";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 // Simple in-memory rate limit (resets when the isolate recycles).
@@ -83,19 +84,19 @@ function buildGeminiBody(input) {
         parts: [{ text: prompt }],
       },
     ],
-    generationConfig: {
-      temperature: typeof input.temperature === "number" ? input.temperature : 0.3,
-    },
   };
+
+  // Gemini 3.x ignores/deprecates temperature; only set JSON mime when needed.
+  if (input.json) {
+    body.generationConfig = {
+      responseMimeType: "application/json",
+    };
+  }
 
   if (input.systemInstruction) {
     body.systemInstruction = {
       parts: [{ text: String(input.systemInstruction) }],
     };
-  }
-
-  if (input.json) {
-    body.generationConfig.responseMimeType = "application/json";
   }
 
   if (input.useSearch) {

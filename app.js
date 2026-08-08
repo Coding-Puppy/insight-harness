@@ -34,6 +34,8 @@ const state = {
   traceItems: [],
   runStartedAt: null,
   mode: "demo",
+  currentGoal: "",
+  currentDomain: "",
 };
 
 const toolPolicies = {
@@ -47,7 +49,7 @@ const toolPolicies = {
     label: "LLM Reasoning",
     maxCalls: 2,
     allowedFor: ["synthesis", "reasoning", "prioritization", "final recommendation"],
-    reason: "用于综合判断、归纳和建议生成（Live Mode 使用 Gemini 2.5 Flash）",
+    reason: "用于综合判断、归纳和建议生成（Live Mode 使用 Gemini 3.6 Flash）",
   },
   calculator: {
     label: "Calculator",
@@ -57,36 +59,49 @@ const toolPolicies = {
   },
 };
 
-const marketEvidence = [
-  {
-    query: "AI customer service SaaS market growth enterprise adoption",
-    title: "企业客服从人工坐席向 AI Agent 和知识库自动化迁移",
-    source: "Market Scan",
-    insight:
-      "需求集中在降本、7x24 响应、多语言覆盖和工单自动分流，尤其适合高频咨询、标准化流程多的 SaaS、跨境电商与金融科技团队。",
-  },
-  {
-    query: "AI客服 SaaS 用户痛点",
-    title: "用户痛点从聊天机器人效果差转向可控、可评估、可接入业务系统",
-    source: "User Review Digest",
-    insight:
-      "客户不只要回答准确，还要求知识更新、转人工策略、权限边界、质检报表和可追溯的回答依据。",
-  },
-  {
-    query: "Intercom Zendesk Ada Fin AI Agent pricing competitors",
-    title: "主流竞品已从基础 bot 升级为按解决量或坐席效率计价",
-    source: "Competitor Desk",
-    insight:
-      "Intercom、Zendesk、Ada、Gorgias 等玩家占据中高端入口，新进入者需要用垂直行业模板、部署速度或本地化服务形成差异。",
-  },
-  {
-    query: "AI customer support automation ROI",
-    title: "ROI 叙事明确，但采购方担心幻觉、集成成本和品牌风险",
-    source: "Buyer Notes",
-    insight:
-      "进入机会不在通用客服机器人，而在可审计、可灰度、能和 CRM/工单/知识库深度联动的行业方案。",
-  },
-];
+function buildDemoEvidence(task, attempt) {
+  const domain = state.currentDomain || inferDomain(state.currentGoal || task.task || "");
+  const topic = task.task || domain;
+
+  if (task.type === "repair") {
+    return {
+      query: `${domain} pricing competitors billing`,
+      title: `补充 ${domain} 竞品价格与计费方式证据`,
+      source: "Repair Search",
+      insight: `围绕「${domain}」补充公开定价/套餐信息后可见：头部玩家多按席位、用量或功能包分层收费；新进入者更适合用垂直场景模板、部署速度或可观测效果证明差异化，而不是正面硬刚通用大盘。`,
+    };
+  }
+
+  const pool = [
+    {
+      query: `${domain} market growth demand`,
+      title: `${domain}：需求从尝鲜转向可规模化落地`,
+      source: "Market Scan",
+      insight: `「${topic}」相关需求正在从概念验证走向预算化采购，买家更关心降本增效、流程嵌入和可量化结果，而不是单点演示效果。`,
+    },
+    {
+      query: `${domain} user pain points`,
+      title: `${domain}：用户痛点转向可控、可集成、可评估`,
+      source: "User Review Digest",
+      insight: `围绕「${domain}」，用户常见诉求包括结果稳定性、系统集成、权限边界、更新维护成本，以及对效果可追溯/可质检的要求。`,
+    },
+    {
+      query: `${domain} competitors pricing`,
+      title: `${domain}：竞争已从功能清单转向包装与计费`,
+      source: "Competitor Desk",
+      insight: `「${domain}」赛道已有通用型与垂直型玩家。公开信息里价格/套餐口径往往不完整，需要继续核对竞品定位、计费方式和替换成本。`,
+    },
+    {
+      query: `${domain} business model entry opportunity`,
+      title: `${domain}：进入机会更可能在垂直切口`,
+      source: "Buyer Notes",
+      insight: `对「${domain}」而言，更稳的进入路径通常不是做全能平台，而是抓住高痛点细分场景，用更快上线、更深工作流绑定或更强可观测性建立差异。`,
+    },
+  ];
+
+  const index = typeof task.id === "number" ? (task.id + attempt - 1) % pool.length : attempt % pool.length;
+  return pool[index];
+}
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -164,7 +179,7 @@ function initConfigUi() {
   const hint = document.querySelector("#configHint");
   if (hint) {
     hint.textContent = proxyReady
-      ? "Live Mode 通过服务端 Proxy 调用 Gemini 2.5 Flash 与 Google Search Grounding，无需填写 Key。关闭后使用本地 Demo Mode。"
+      ? "Live Mode 通过服务端 Proxy 调用 Gemini 3.6 Flash 与 Google Search Grounding，无需填写 Key。关闭后使用本地 Demo Mode。"
       : "当前未配置 Proxy，仅可使用 Demo Mode。请部署 worker/ 并在 config.public.js 填写 proxyUrl。";
   }
 
@@ -379,7 +394,7 @@ function validatePlan(plan, fallbackGoal) {
     goal: String(plan.goal || fallbackGoal).trim(),
     domain: String(plan.domain || inferDomain(fallbackGoal)).trim(),
     planning_strategy: String(plan.planning_strategy || "market_entry_research").trim(),
-    source: "gemini-2.5-flash",
+    source: "gemini-3.6-flash",
     tasks: normalizedTasks,
   };
 }
@@ -470,16 +485,7 @@ function renderPlannerOutput(plan) {
 function executeToolDemo(task, route, attempt) {
   if (route.tool === "web_search") {
     const taskWeight = typeof task.id === "number" ? task.id : 2;
-    const evidence =
-      task.type === "repair"
-        ? {
-            query: "AI customer service SaaS pricing Intercom Zendesk Ada Gorgias",
-            title: "补充竞品价格证据：按坐席、解决量与 AI 功能包计价并存",
-            source: "Repair Search",
-            insight:
-              "竞品常见计费方式包括按坐席、按自动解决量、按 AI Agent 功能包或工单量分层，新进入者可用垂直模板和可观测质检降低替换成本。",
-          }
-        : marketEvidence[(task.id + attempt - 1) % marketEvidence.length];
+    const evidence = buildDemoEvidence(task, attempt);
     return {
       tool: route.tool,
       latency: 1.6 + taskWeight * 0.35 + attempt * 0.3,
@@ -490,6 +496,7 @@ function executeToolDemo(task, route, attempt) {
     };
   }
 
+  const domain = state.currentDomain || "目标赛道";
   return {
     tool: route.tool,
     latency: 2.1,
@@ -497,9 +504,9 @@ function executeToolDemo(task, route, attempt) {
     evidence: {
       title: "Synthesis",
       source: "LLM",
-      insight: "综合证据后给出市场进入判断、目标客群和产品策略。",
+      insight: `综合「${domain}」相关证据后，给出市场进入判断、目标客群和产品策略。`,
     },
-    summary: "结合需求、竞品和商业模式形成进入建议。",
+    summary: `结合「${domain}」的需求、竞品和商业模式形成进入建议。`,
     source: "demo",
   };
 }
@@ -607,7 +614,7 @@ Return:
     resultCount: 1,
     evidence: {
       title: "Gemini intermediate synthesis",
-      source: "Gemini 2.5 Flash",
+      source: "Gemini 3.6 Flash",
       insight: text,
     },
     summary: text,
@@ -641,35 +648,55 @@ async function executeTool(task, route, attempt, observations) {
 }
 
 function synthesizeDemo(goal, plan, observations, attempt) {
+  const domain = escapeHtml(plan.domain || state.currentDomain || inferDomain(goal));
   const safeGoal = escapeHtml(goal);
+  const snippets = observations
+    .map((item) => item.result?.evidence?.insight || item.result?.summary || "")
+    .filter(Boolean)
+    .slice(0, 3);
+  const evidenceLine = snippets.length
+    ? snippets.map((item) => escapeHtml(item)).join(" ")
+    : `目前仅有关于「${domain}」的初步信号，仍需补充更具体的公开证据。`;
+
   const competitorDepth =
     attempt === 0
-      ? "竞品价格信息仍偏粗，需要补充 Intercom、Zendesk、Ada 等方案的包装和计价口径。"
-      : "竞品侧已补充按解决量、坐席数、AI agent 功能包等常见计价口径，可支持更稳的定位判断。";
+      ? `竞品与价格信息仍偏粗，需要继续核实「${domain}」头部玩家的定位、套餐和替换成本。`
+      : `已补充更多「${domain}」竞品包装/计费线索，可支撑更稳的定位判断，但仍建议交叉验证一手资料。`;
   const recommendation =
     attempt === 0
-      ? "谨慎进入，先补足竞品证据。"
-      : "值得以垂直行业切口进入，但不建议做通用客服机器人。";
+      ? `对「${domain}」建议谨慎进入，先补足竞品与证据缺口。`
+      : `「${domain}」值得以垂直切口试探进入，但不建议一上来做全能横向平台。`;
+
+  const text = [
+    `01 市场机会`,
+    `${safeGoal}。围绕「${domain}」，机会更可能来自可规模化降本、流程嵌入和可量化结果，而不是单点功能演示。`,
+    `02 用户痛点`,
+    `买家关注稳定性、集成成本、权限边界、维护负担，以及效果是否可评估、可追溯。`,
+    `03 核心竞品`,
+    `${evidenceLine} ${competitorDepth}`,
+    `04 进入建议`,
+    `${recommendation} 更稳的产品叙事是：针对「${domain}」做可调度、可观测、可迭代的 Agent Harness，而不是只输出一段答案。`,
+  ].join("\n\n");
 
   return {
     html: `
       <h3>01 市场机会</h3>
-      <p>${safeGoal} 的核心机会来自客服成本压力、响应时效要求和知识库自动化。更强的购买动机来自高咨询量、高标准化、高客诉风险的行业。</p>
+      <p>${safeGoal}。围绕「${domain}」，机会更可能来自可规模化降本、流程嵌入和可量化结果，而不是单点功能演示。</p>
       <ul>
-        <li>优先客群：跨境电商、B2B SaaS、金融科技、在线教育和本地生活平台。</li>
-        <li>高价值场景：售前咨询、订单状态、退款政策、账号问题、工单分流和质检复盘。</li>
+        <li>优先验证：谁有预算、谁有高频痛点、谁愿意为可观测效果付费。</li>
+        <li>高价值切入：能嵌入现有工作流、缩短上线周期、并能证明 ROI 的细分场景。</li>
       </ul>
 
       <h3>02 用户痛点</h3>
-      <p>用户不再满足于“能聊天”，而是要求结果可控、证据可追溯、能接入业务系统，并且能在低置信度时稳定转人工。</p>
+      <p>买家关注稳定性、集成成本、权限边界、维护负担，以及效果是否可评估、可追溯。</p>
 
       <h3>03 核心竞品</h3>
-      <p>Intercom、Zendesk、Ada、Gorgias 等产品已经覆盖通用客服自动化，新团队需要避开纯横向竞争。${competitorDepth}</p>
+      <p>${evidenceLine} ${competitorDepth}</p>
 
       <h3>04 进入建议</h3>
-      <p>${recommendation} 可把产品定位为“行业客服 Agent Harness”：内置任务拆解、工具路由、回答追踪、质检评分和自动补证据，帮助客户看到 AI 客服为什么这么答、答得好不好、何时需要修复。</p>
+      <p>${recommendation} 更稳的产品叙事是：针对「${domain}」做可调度、可观测、可迭代的 Agent Harness，而不是只输出一段答案。</p>
     `,
-    text: `Demo synthesis for ${goal}`,
+    text,
     observations,
     taskCount: plan.tasks.length,
     source: "demo",
@@ -743,10 +770,12 @@ Write a concise Chinese research report with these sections:
 04 进入建议
 
 Requirements:
-- Be specific and evidence-based.
+- Stay strictly on the user's goal and domain. Do NOT reuse unrelated examples.
+- Do NOT mention Intercom / Zendesk / Ada / Gorgias / AI客服 unless they truly appear in the evidence pool or the user goal.
+- Be specific and evidence-based; name only competitors supported by the evidence.
 - Mention uncertainties explicitly.
 - If evidence about pricing/competitors is thin, say so clearly.
-- End with a clear go / cautious / no-go style recommendation.`;
+- End with a clear go / cautious / no-go style recommendation for THIS domain.`;
 
   const { text } = await callGemini({
     prompt,
@@ -758,7 +787,7 @@ Requirements:
     text,
     observations,
     taskCount: plan.tasks.length,
-    source: "gemini-2.5-flash",
+    source: "gemini-3.6-flash",
   };
 }
 
@@ -876,7 +905,7 @@ function normalizeEvaluation(raw, plan, synthesis) {
     rubric: defaultRubric,
     issues: issues.length ? issues : decision === "pass" ? ["无明显阻断性问题"] : ["需要补充证据"],
     repairTask,
-    source: "gemini-2.5-flash",
+    source: "gemini-3.6-flash",
   };
 }
 
@@ -1012,7 +1041,7 @@ async function createPlan(goal) {
   }
 
   try {
-    await addTrace("planner", "Calling Gemini Planner", "model: gemini-2.5-flash", "•", 60);
+    await addTrace("planner", "Calling Gemini Planner", "model: gemini-3.6-flash", "•", 60);
     return await planWithGemini(goal);
   } catch (error) {
     await addTrace(
@@ -1078,12 +1107,14 @@ async function runHarness() {
   updateModeBadge();
 
   const modeLabel = canUseLiveMode()
-    ? "Live Mode via shared proxy: Gemini 2.5 Flash + Google Search Grounding"
+    ? "Live Mode via shared proxy: Gemini 3.6 Flash + Google Search Grounding"
     : "Demo Mode: local rule-based simulation";
   await addTrace("system", "Harness mode", modeLabel, "•", 60);
 
   await addTrace("planner", "Planning started", "Planner receives the user research goal.", "•", 80);
   const plan = await createPlan(goal);
+  state.currentGoal = plan.goal;
+  state.currentDomain = plan.domain;
   renderPlannerOutput(plan);
   await addTrace(
     "planner",

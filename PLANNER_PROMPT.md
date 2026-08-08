@@ -126,4 +126,4 @@ If validation fails, the Harness should ask the Planner to regenerate JSON or fa
 
 ## Interview Explanation
 
-> 当前项目同时支持 Demo Mode 和 Live Mode。Demo Mode 用规则模拟 Planner，保证演示稳定；Live Mode 会调用 Gemini 2.5 Flash，按这份 Prompt 输出结构化 JSON，并通过校验规则检查任务数量、工具合法性和成功标准。校验失败或不稳定时回退到规则计划。这样既保留了 LLM 的灵活性，又避免 Agent 随意规划和随意调用工具。
+> 当前项目同时支持 Demo Mode 和 Live Mode。Demo Mode 用规则模拟 Planner，保证演示稳定；Live Mode 会调用 Gemini 3.6 Flash，按这份 Prompt 输出结构化 JSON，并通过校验规则检查任务数量、工具合法性和成功标准。校验失败或不稳定时回退到规则计划。这样既保留了 LLM 的灵活性，又避免 Agent 随意规划和随意调用工具。
