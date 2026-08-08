@@ -122,12 +122,11 @@ function getResponseText(payload) {
 
 function shouldTryNextModel(status, message) {
   const text = String(message || "").toLowerCase();
+  // Only fall back when the model itself is unavailable.
+  // Do NOT fall back on 429/quota errors — that would burn the free tier faster.
   if (status === 404) return true;
-  if (status === 429) return true;
   if (text.includes("no longer available")) return true;
-  if (text.includes("not found")) return true;
-  if (text.includes("quota exceeded")) return true;
-  if (text.includes("rate limit")) return true;
+  if (text.includes("not found") && text.includes("model")) return true;
   return false;
 }
 
