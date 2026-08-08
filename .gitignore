@@ -1,0 +1,8 @@
+.DS_Store
+未命名/
+config.local.js
+.env
+.env.*
+worker/node_modules/
+worker/.wrangler/
+worker/.dev.vars

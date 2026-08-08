@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Insight Harness</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <h1>Insight Harness</h1>
+          <p>Vertical Research Agent Harness</p>
+        </div>
+        <div class="status" id="statusDot">
+          <span></span>
+          Ready
+        </div>
+      </header>
+
+      <section class="config-band" aria-label="Harness mode">
+        <div class="config-row">
+          <label class="mode-toggle">
+            <input id="liveModeToggle" type="checkbox" />
+            <span>Live Mode · Gemini 2.5 Flash</span>
+          </label>
+          <div class="mode-badge" id="modeBadge">Demo Mode</div>
+        </div>
+        <p class="config-hint" id="configHint">
+          Live Mode 通过服务端 Proxy 调用 Gemini（含 Google Search Grounding），访客无需填写 Key。
+          关闭后回退到本地 Demo Mode。
+        </p>
+      </section>
+
+      <section class="task-band">
+        <label for="researchTask">Research Task</label>
+        <div class="task-row">
+          <textarea id="researchTask" rows="3">分析 AI 客服 SaaS 市场是否值得进入</textarea>
+          <button id="runButton" type="button">
+            <span class="button-icon">▶</span>
+            Run Harness
+          </button>
+        </div>
+      </section>
+
+      <section class="loop-band" aria-label="Harness Loop">
+        <div class="loop-step">
+          <strong>Plan</strong>
+          <span>拆解研究任务</span>
+        </div>
+        <div class="loop-arrow">→</div>
+        <div class="loop-step">
+          <strong>Route</strong>
+          <span>选择合适工具</span>
+        </div>
+        <div class="loop-arrow">→</div>
+        <div class="loop-step">
+          <strong>Execute</strong>
+          <span>调用工具取证据</span>
+        </div>
+        <div class="loop-arrow">→</div>
+        <div class="loop-step">
+          <strong>Observe</strong>
+          <span>记录执行链路</span>
+        </div>
+        <div class="loop-arrow">→</div>
+        <div class="loop-step">
+          <strong>Evaluate</strong>
+          <span>评分并发现缺口</span>
+        </div>
+        <div class="loop-arrow">→</div>
+        <div class="loop-step">
+          <strong>Retry</strong>
+          <span>补充搜索并修复</span>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <aside class="trace-pane">
+          <div class="pane-title">
+            <h2>Execution Trace</h2>
+            <div class="trace-actions">
+              <button id="exportTrace" type="button" aria-label="Export trace">⇩</button>
+              <button id="resetButton" type="button" aria-label="Reset">↺</button>
+            </div>
+          </div>
+          <ol id="traceList" class="trace-list">
+            <li class="empty-state">Run a task to inspect the harness chain.</li>
+          </ol>
+        </aside>
+
+        <section class="output-pane">
+          <div class="pane-title">
+            <h2>Research Output</h2>
+            <div class="score-chip" id="scoreChip">Score --</div>
+          </div>
+          <article id="researchOutput" class="research-output">
+            <h3>等待运行</h3>
+            <p>输入一个垂直行业研究问题，Harness 会完成 Plan → Route → Execute → Observe → Evaluate → Retry 的闭环。</p>
+          </article>
+        </section>
+      </section>
+
+      <section class="planner-band">
+        <div class="pane-title">
+          <h2>Planner Output</h2>
+          <div class="score-chip">JSON</div>
+        </div>
+        <pre id="plannerOutput">Run a task to inspect the structured plan.</pre>
+      </section>
+
+      <section class="evaluation-band">
+        <div class="pane-title">
+          <h2>Evaluator Report</h2>
+          <div class="score-chip" id="evaluationDecision">Pending</div>
+        </div>
+        <div id="evaluationReport" class="evaluation-grid">
+          <div class="empty-state">Run a task to inspect quality rubric scores.</div>
+        </div>
+      </section>
+
+      <section class="metrics-band">
+        <div>
+          <span>Tool Calls</span>
+          <strong id="toolCalls">0</strong>
+        </div>
+        <div>
+          <span>Latency</span>
+          <strong id="latency">0.0s</strong>
+        </div>
+        <div>
+          <span>Retry</span>
+          <strong id="retryCount">0</strong>
+        </div>
+        <div>
+          <span>Quality</span>
+          <strong id="quality">--</strong>
+        </div>
+        <div>
+          <span>Evidence</span>
+          <strong id="evidence">--</strong>
+        </div>
+        <div>
+          <span>Completeness</span>
+          <strong id="completeness">--</strong>
+        </div>
+      </section>
+
+      <section class="feedback-band">
+        <div>
+          <h2>User Feedback</h2>
+          <p>反馈会保存在浏览器本地，并可导出为 CSV 用于后续迭代。</p>
+        </div>
+        <form id="feedbackForm">
+          <div class="feedback-actions" role="group" aria-label="Usefulness">
+            <button type="button" class="feedback-choice active" data-value="Useful">👍 Useful</button>
+            <button type="button" class="feedback-choice" data-value="Needs Improvement">👎 Needs Improvement</button>
+          </div>
+          <input id="feedbackText" type="text" placeholder="competitor analysis is too shallow" />
+          <button type="submit">Submit</button>
+          <button id="exportFeedback" type="button">Export CSV</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="./config.public.js"></script>
+    <script src="./config.local.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+name = "insight-harness-proxy"
+main = "src/index.js"
+compatibility_date = "2026-03-01"
+
+# Optional: restrict browser origins. Comma-separated.
+# Example: "https://yourname.github.io,http://localhost:8080"
+# [vars]
+# ALLOWED_ORIGINS = "*"
+
+# Set the secret after deploy:
+#   npx wrangler secret put GEMINI_API_KEY
