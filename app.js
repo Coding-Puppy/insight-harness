@@ -415,7 +415,7 @@ function validatePlan(plan, fallbackGoal) {
     goal: String(plan.goal || fallbackGoal).trim(),
     domain: String(plan.domain || inferDomain(fallbackGoal)).trim(),
     planning_strategy: String(plan.planning_strategy || "market_entry_research").trim(),
-    source: "gemini-flash",
+    source: "gemini-3.5-flash-lite",
     tasks: normalizedTasks,
   };
 }
@@ -635,7 +635,7 @@ Return:
     resultCount: 1,
     evidence: {
       title: "Gemini intermediate synthesis",
-      source: "Gemini Flash",
+      source: "Gemini 3.5 Flash-Lite",
       insight: text,
     },
     summary: text,
@@ -824,7 +824,7 @@ Requirements:
     text: cleaned,
     observations,
     taskCount: plan.tasks.length,
-    source: "gemini-flash",
+    source: "gemini-3.5-flash-lite",
   };
 }
 
@@ -942,7 +942,7 @@ function normalizeEvaluation(raw, plan, synthesis) {
     rubric: defaultRubric,
     issues: issues.length ? issues : decision === "pass" ? ["无明显阻断性问题"] : ["需要补充证据"],
     repairTask,
-    source: "gemini-flash",
+    source: "gemini-3.5-flash-lite",
   };
 }
 
@@ -1078,7 +1078,7 @@ async function createPlan(goal) {
   }
 
   try {
-    await addTrace("planner", "Calling Gemini Planner", "model: gemini-flash", "•", 60);
+    await addTrace("planner", "Calling Gemini Planner", "model: gemini-3.5-flash-lite", "•", 60);
     return await planWithGemini(goal);
   } catch (error) {
     await addTrace(
