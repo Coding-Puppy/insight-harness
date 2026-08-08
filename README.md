@@ -2,6 +2,8 @@
 
 面向垂直行业研究的 **Agent Harness Console**。
 
+**在线 Demo：** [https://coding-puppy.github.io/insight-harness/](https://coding-puppy.github.io/insight-harness/)
+
 不是 ChatGPT Clone，而是把研究 Agent 的中间过程做成可控台：
 
 **任务调度 → 工具管控 → 效果观测 → 闭环迭代**
@@ -159,5 +161,5 @@ PRODUCT_SPEC.md + module docs      # 产品与设计说明
 - [x] Gemini 2.5 Flash Planner / Synthesizer / Evaluator  
 - [x] Gemini Google Search Grounding  
 - [x] 服务端 Proxy，支持分享链接直接 Live  
-- [ ] GitHub Pages 在线 Demo  
+- [x] GitHub Pages 在线 Demo  
 - [ ] 按垂直行业配置 Evaluator 权重  
